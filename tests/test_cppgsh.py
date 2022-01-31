@@ -37,8 +37,8 @@ def runtimeit(funcstr, number=10000):
             print("<UnicodeError text>: {} ns (mem after {}KB)".format(int(1000000000 * p / number), am))
         i += 1
 
-def _test_cppgsh():
-    pass
+def test_cppgsh():
+    assert(True)
 
 if __name__ == '__main__':
     import os
