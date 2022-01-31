@@ -22,6 +22,9 @@ is_test = 'pytest' in sys.argv or 'test' in sys.argv
 updatebadge.readme(pjoin(thisdir, "README.md"), new_version=__version__)
 
 setup(
+    # to be package directory name.
+    packages=[PROJECT_NAME],
+
     # Require pytest-runner only when running tests
     setup_requires=['pytest-runner>=2.0,<3dev'] if is_test else [],
 )
