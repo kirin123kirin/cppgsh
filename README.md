@@ -37,7 +37,7 @@ $ pip uninstall cppgsh
 
 # Usage
 ```
-usage: cppgsh [-h] [--version] [--include_guard format]
+usage: cppgsh [-h] [--include_guard format]
               [--include_directory INCLUDE_DIRECTORY]
               [--source_directory SOURCE_DIRECTORY]
               [--license_files LICENSE_FILES] [--del_extern_C]
@@ -52,7 +52,6 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  --version             show program's version number and exit
   --include_guard format, -g format
                         Regex format of the include guard. Default: None
   --include_directory INCLUDE_DIRECTORY, -I INCLUDE_DIRECTORY

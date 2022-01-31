@@ -334,7 +334,6 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(prog=PGNAME, description='Single header generator for C++ libraries.')
-    parser.add_argument('--version', action='version', version='{} {}'.format(PGNAME, Path(__file__).parent.joinpath("VERSION").read_text()))
     parser.add_argument('input_path', metavar='input', type=Path, help='Input directory path.')
     parser.add_argument('output_path', metavar='output', type=Path,
                         help='Output file path of the generated single header file.')
