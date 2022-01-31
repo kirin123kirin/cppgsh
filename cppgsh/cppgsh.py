@@ -13,11 +13,13 @@ __all__ = ["GenSingleHeader"]
 PGNAME = "cppgsh"
 ENCODING = "utf-8"
 LINESEP = "\n"
+EXCLUDES = ['test', 'tests', 'test*/**', 'tool', 'tool/**', '.*', 'bak', 'old', 'org']
 
 import os
 import sys
 import re
 from glob import glob
+from fnmatch import fnmatch
 from os.path import basename
 from collections import defaultdict
 from io import StringIO
@@ -53,18 +55,20 @@ class GenSingleHeader(object):
     re_externC = re.compile(
         r'(?:^extern\s+"C"\s+|(?:/\*.+\*/|//[^\r\n]*)?\s*#ifdef __cplusplus\s+(extern\s+"C"\s+\{|\})[^\r\n]*\s*#endif\s*(?:/\*.+\*/|//[^\r\n]+)?)')
 
-    def __init__(self, include_directories, source_directories=None,
+    def __init__(self, include_directories, source_directories=None, exclude_patterns=EXCLUDES,
                  include_guard=None, license_files=[], del_extern_C=False,
-                 encoding=ENCODING, linesep=LINESEP):
+                 encoding=ENCODING, linesep=LINESEP, quiet=False):
 
-        self.include_directories = [Path(x) for x in include_directories] if include_directories else []
-        self.source_directories = [Path(x) for x in source_directories] if source_directories else [Path('.')]
+        self.include_directories = include_directories
+        self.source_directories = source_directories
+        self.exclude_patterns = exclude_patterns
         self.include_guard = include_guard.replace('.', '_').upper() if include_guard else None
         self.del_extern_C = del_extern_C
         self.encoding = encoding
 
         self.license_files = license_files
         self.linesep = linesep
+        self.quiet = quiet
 
         self._data = None
         self.target_src = ('.c', '.cpp', '.cxx', '.cc', '.c++', '.cp', '.C')
@@ -80,20 +84,29 @@ class GenSingleHeader(object):
     def data(self):
         if self._data is None:
             self._data = {}
+            extensions = set(self.target_src + self.target_header)
+            done = set()
+
             for x in self.include_directories + self.source_directories:
-                for p in map(Path, glob(str(x.joinpath('*')), recursive=True)):
-                    if p.is_file() and p.suffix.lower() in self.target_src + self.target_header:
-                        data = p.read_text(self.encoding)
-                        if self.del_extern_C:
-                            ret = self.re_externC.search(data)
-                            if ret:
-                                matchtxt = ret.group(0)
-                                if "#" in matchtxt:
-                                    matchtxt = matchtxt.replace(self.linesep, f"{self.linesep}// {self.signature}: ")
-                                else:
-                                    matchtxt = f"/* {self.signature} {matchtxt} */"
-                                data = self.re_externC.sub(matchtxt, data)
-                        self._data[p.name] = tokenize(data)
+                for p in map(Path, glob(str(x.joinpath('**')), recursive=True)):
+                    if p.is_dir() or p.resolve() in done or p.suffix.lower() not in extensions:
+                        continue
+                    if next((True for pat in self.exclude_patterns if fnmatch(p, pat)), False):
+                        continue
+                    data = p.read_text(self.encoding)
+                    if self.del_extern_C:
+                        ret = self.re_externC.search(data)
+                        if ret:
+                            matchtxt = ret.group(0)
+                            if "#" in matchtxt:
+                                matchtxt = matchtxt.replace(self.linesep, f"{self.linesep}// {self.signature}: ")
+                            else:
+                                matchtxt = f"/* {self.signature} {matchtxt} */"
+                            data = self.re_externC.sub(matchtxt, data)
+                    self._data[p.name] = tokenize(data)
+                    done.add(p.resolve())
+                    if not self.quiet:
+                        print("   loading... ", p)
 
         return self._data
 
@@ -236,6 +249,7 @@ class GenSingleHeader(object):
                     disporder[name] += int(disporder[par] * interest)
 
             self._private_headers = sorted(disporder, key=lambda k: disporder[k], reverse=True)
+
         return self._private_headers
 
     @property
@@ -259,7 +273,7 @@ class GenSingleHeader(object):
 
     def end_of(self, filename):
         self.page_break
-        self.result.write(f"/* {{{{{{ end of {filename} */")
+        self.result.write(f"/* }}}}}} end of {filename} */")
         self.page_break
 
     def write_license(self):
@@ -296,7 +310,7 @@ class GenSingleHeader(object):
 
     def write_headline(self):
         if self.include_guard:
-            self.result.write(f"#ifndef {self.include_guard}")
+            self.result.write(f"#ifndef {self.include_guard}{self.linesep}")
             self.result.write(f"#define {self.include_guard}")
 
         self.page_break
@@ -323,10 +337,20 @@ class GenSingleHeader(object):
         self.eof
 
     def make(self):
+        if not self.quiet:
+            print("make license")
         self.write_license()
+        if not self.quiet:
+            print("make headline")
         self.write_headline()
+        if not self.quiet:
+            print("make headers")
         self.write_headers()
+        if not self.quiet:
+            print("make sources")
         self.write_sources()
+        if not self.quiet:
+            print("make fotter")
         self.write_footer()
         return self.result.getvalue()
 
@@ -334,7 +358,6 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(prog=PGNAME, description='Single header generator for C++ libraries.')
-    parser.add_argument('input_path', metavar='input', type=Path, help='Input directory path.')
     parser.add_argument('output_path', metavar='output', type=Path,
                         help='Output file path of the generated single header file.')
     parser.add_argument('--include_guard', '-g', metavar='format', type=str, default=None,
@@ -344,6 +367,9 @@ def main():
     parser.add_argument('--source_directory', '-S', type=Path, action='append', default=[Path('.')],
                         help='Set the source directories for source files. '
                              'Use ./ or .\\ in front of a path to mark as relative to the header file.')
+    parser.add_argument('--exclude_patterns', '-E', type=str, action='append', default=EXCLUDES,
+                        help='Set the source directories for source files. '
+                             'Use ./ or .\\ in front of a path to mark as relative to the header file.')
     parser.add_argument('--license_files', '-L', type=Path, action='append', default=[],
                         help='Set headline writing License text file path')
     parser.add_argument('--del_extern_C', action='store_false', help='delete define "extern \"C\""')
@@ -351,14 +377,18 @@ def main():
                         help='line separator of output file.')
     parser.add_argument('--encoding', '-e', type=str, default=ENCODING,
                         help='The encoding used to read and write all files.')
+    parser.add_argument('--quiet', '-q', action='store_true', help='no print progress info')
 
     args = parser.parse_args(sys.argv[1:])
 
     with args.output_path.open('w+', encoding=args.encoding) as file:
-        ish = GenSingleHeader(args.include_directory, args.source_directory,
+        ish = GenSingleHeader(args.include_directory, args.source_directory, args.exclude_patterns,
                               args.include_guard, args.license_files, args.del_extern_C,
-                              args.encoding, args.linesep)
+                              args.encoding, args.linesep, args.quiet)
         file.write(ish.make())
+
+    if not args.quiet:
+        print("\nDone.")
 
 
 if __name__ == '__main__':
