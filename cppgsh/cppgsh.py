@@ -21,7 +21,7 @@ import re
 from glob import glob
 from fnmatch import fnmatch
 from os.path import basename
-from collections import defaultdict
+from collections import defaultdict, Counter
 from io import StringIO
 from itertools import chain
 
@@ -222,21 +222,21 @@ class GenSingleHeader(object):
                 return None
 
             for name, token in self.data.items():
-                dellist = []
-                total = len(token)
-                for i, t in enumerate(token):
-                    if isinstance(t, PreprocessorIncludeToken):
-                        path = basename(str(t.path))
-                        if '"' in t.raw and path in self.data:
-                            dellist.append(i)
-                            rate = int(100 * (total - i) / total)
-                            disporder[path] += parent_score * rate
-                            disporder[name] += child_score * rate
-                            tree[path].append(name)
-                    elif isinstance(t, PreprocessorDefineToken):
-                        defs[getarg(t)].append(name)
+                    dellist = []
+                    total = len(token)
+                    for i, t in enumerate(token):
+                        if isinstance(t, PreprocessorIncludeToken):
+                            path = basename(str(t.path))
+                            if '"' in t.raw and path in self.data:
+                                dellist.append(i)
+                                rate = int(100 * (total - i) / total)
+                                disporder[path] += parent_score * rate
+                                disporder[name] += child_score * rate
+                                tree[path].append(name)
+                        elif isinstance(t, PreprocessorDefineToken):
+                            defs[getarg(t)].append(name)
 
-                self.delete_lines(name, dellist)
+                    self.delete_lines(name, dellist)
 
             for name, token in self.data.items():
                 for t in token:
@@ -247,8 +247,8 @@ class GenSingleHeader(object):
             for name, token in self.data.items():
                 for par in tree.get(name, []):
                     disporder[name] += int(disporder[par] * interest)
-
-            self._private_headers = sorted(disporder, key=lambda k: disporder[k], reverse=True)
+            headers_only = (d for d in disporder if any(map(d.endswith, self.target_header)))
+            self._private_headers = sorted(headers_only, key=lambda k: disporder[k], reverse=True)
 
         return self._private_headers
 
@@ -335,7 +335,7 @@ class GenSingleHeader(object):
         if self.include_guard:
             self.result.write(f"#endif /* {self.include_guard} */")
         self.eof
-
+    
     def make(self):
         if not self.quiet:
             print("make license")
@@ -352,6 +352,9 @@ class GenSingleHeader(object):
         if not self.quiet:
             print("make fotter")
         self.write_footer()
+        if not self.quiet:
+            print("make redefine check & repair")
+        self.redefine_repair()
         return self.result.getvalue()
 
 def main():

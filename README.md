@@ -1,5 +1,5 @@
 # cppgsh  by Python Library
-[![Upload pypi.org](https://github.com/kirin123kirin/cppgsh/actions/workflows/pypi.yml/badge.svg?branch=v0.1.5)](https://github.com/kirin123kirin/cppgsh/actions/workflows/pypi.yml)
+[![Upload pypi.org](https://github.com/kirin123kirin/cppgsh/actions/workflows/pypi.yml/badge.svg?branch=v0.1.8)](https://github.com/kirin123kirin/cppgsh/actions/workflows/pypi.yml)
 
 # Overview
 This Program Inspired by [Quom](https://github.com/Viatorus/quom#quom) I made.
@@ -40,14 +40,14 @@ $ pip uninstall cppgsh
 usage: cppgsh [-h] [--include_guard format]
               [--include_directory INCLUDE_DIRECTORY]
               [--source_directory SOURCE_DIRECTORY]
+              [--exclude_patterns EXCLUDE_PATTERNS]
               [--license_files LICENSE_FILES] [--del_extern_C]
-              [--linesep LINESEP] [--encoding ENCODING]
-              input output
+              [--linesep LINESEP] [--encoding ENCODING] [--quiet]
+              output
 
 Single header generator for C++ libraries.
 
 positional arguments:
-  input                 Input directory path.
   output                Output file path of the generated single header file.
 
 optional arguments:
@@ -60,6 +60,10 @@ optional arguments:
                         Set the source directories for source files. Use ./ or
                         .\ in front of a path to mark as relative to the
                         header file.
+  --exclude_patterns EXCLUDE_PATTERNS, -E EXCLUDE_PATTERNS
+                        Set the source directories for source files. Use ./ or
+                        .\ in front of a path to mark as relative to the
+                        header file.
   --license_files LICENSE_FILES, -L LICENSE_FILES
                         Set headline writing License text file path
   --del_extern_C        delete define "extern "C""
@@ -67,6 +71,7 @@ optional arguments:
                         line separator of output file.
   --encoding ENCODING, -e ENCODING
                         The encoding used to read and write all files.
+  --quiet, -q           no print progress info
 
 ```
 # Example
