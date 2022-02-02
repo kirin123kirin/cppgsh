@@ -395,7 +395,6 @@ def main():
 
     def _redefine_check(ish):
         is_define = re.compile(r"\s*#\s*((?:define)\s+[^\s]*)").match
-        is_ifetc = re.compile(r"\s*#\s*((?:else|elif)\s*[^\s]*)").match
         ish.result.seek(0)
         res = ish.result.readlines()
         dup = defaultdict(list)
