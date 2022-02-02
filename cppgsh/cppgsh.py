@@ -70,6 +70,7 @@ class GenSingleHeader(object):
         self.license_files = license_files
         self.linesep = linesep
         self.quiet = quiet
+        self.redefine_auto_check_repair = True
 
         self._data = None
         self.target_src = ('.c', '.cpp', '.cxx', '.cc', '.c++', '.cp', '.C')
@@ -246,6 +247,8 @@ class GenSingleHeader(object):
                             disporder[x] += atomic_score
 
             for name, token in self.data.items():
+                if not self.quiet:
+                    print("   writing...", name)
                 for par in tree.get(name, []):
                     disporder[name] += int(disporder[par] * interest)
             headers_only = (d for d in disporder if any(map(d.endswith, self.target_header)))
@@ -256,7 +259,12 @@ class GenSingleHeader(object):
     @property
     def sources(self):
         if self._sources is None:
-            self._sources = [x for x in self.data if any(map(x.endswith, self.target_src))]
+            self._sources = []
+            for x in self.data:
+                if any(map(x.endswith, self.target_src)):
+                    self._sources.append(x)
+                    if not self.quiet:
+                        print("   writing...", x)
         return self._sources
 
     @property
@@ -287,6 +295,8 @@ class GenSingleHeader(object):
                     dat = Path(ls).read_text()
                     self.result.write(dat)
                     self.page_break
+                    if not self.quiet:
+                        print("   found license file", ls)
             if dat:
                 self.result.write("*** */")
                 self.page_break
@@ -298,6 +308,8 @@ class GenSingleHeader(object):
                     self.result.write(Path(ls).read_text())
                     self.result.write("*** */")
                     self.page_break
+                    if not self.quiet:
+                        print("   found license file", ls)
                 return ls
 
             datadir = self.include_directories + self.source_directories
@@ -339,23 +351,19 @@ class GenSingleHeader(object):
 
     def make(self):
         if not self.quiet:
-            print("make license")
+            print("\find license...\n")
         self.write_license()
+
         if not self.quiet:
-            print("make headline")
+            print("\nmerging headers...\n")
         self.write_headline()
-        if not self.quiet:
-            print("make headers")
         self.write_headers()
+
         if not self.quiet:
-            print("make sources")
+            print("\nmerging sources...\n")
         self.write_sources()
-        if not self.quiet:
-            print("make fotter")
+
         self.write_footer()
-        if not self.quiet:
-            print("make redefine check & repair")
-        self.redefine_repair()
         return self.result.getvalue()
 
 def main():
@@ -385,14 +393,35 @@ def main():
 
     args = parser.parse_args(sys.argv[1:])
 
+    def _redefine_check(ish):
+        is_define = re.compile(r"\s*#\s*((?:define)\s+[^\s]*)").match
+        is_ifetc = re.compile(r"\s*#\s*((?:else|elif)\s*[^\s]*)").match
+        ish.result.seek(0)
+        res = ish.result.readlines()
+        dup = defaultdict(list)
+        for i, line in enumerate(res, 1):
+            m = is_define(line)
+            if m:
+                dup[m.group(1).strip(" #\t\r\n")].append(i)
+
+        outf = str(args.output_path.resolve())
+        for k, v in dup.items():
+            if len(v) > 1 and v[1] - v[0] > 40:
+                warn = '\n\t'.join([outf + ':' + str(x) for x in v[1:]])
+                print(f"\n\n\n[WARNING] May be Redefine Macro: \n{k} ->\n{outf}:{v[0]} \n\n\t{warn}", file=sys.stderr)
+
     with args.output_path.open('w+', encoding=args.encoding) as file:
         ish = GenSingleHeader(args.include_directory, args.source_directory, args.exclude_patterns,
                               args.include_guard, args.license_files, args.del_extern_C,
                               args.encoding, args.linesep, args.quiet)
         file.write(ish.make())
 
+        if not args.quiet:
+            print("\nredefine macro checking...\n")
+        _redefine_check(ish)
+
     if not args.quiet:
-        print("\nDone.")
+        print("\nOK Done.")
 
 
 if __name__ == '__main__':
