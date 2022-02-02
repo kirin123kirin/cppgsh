@@ -15,6 +15,7 @@ ENCODING = "utf-8"
 LINESEP = "\n"
 EXCLUDES = ['test', 'tests', 'test*/**', 'tool', 'tool/**', '.*', 'bak', 'old', 'org']
 
+from email.policy import default
 import os
 import sys
 import re
@@ -222,21 +223,21 @@ class GenSingleHeader(object):
                 return None
 
             for name, token in self.data.items():
-                    dellist = []
-                    total = len(token)
-                    for i, t in enumerate(token):
-                        if isinstance(t, PreprocessorIncludeToken):
-                            path = basename(str(t.path))
-                            if '"' in t.raw and path in self.data:
-                                dellist.append(i)
-                                rate = int(100 * (total - i) / total)
-                                disporder[path] += parent_score * rate
-                                disporder[name] += child_score * rate
-                                tree[path].append(name)
-                        elif isinstance(t, PreprocessorDefineToken):
-                            defs[getarg(t)].append(name)
+                dellist = []
+                total = len(token)
+                for i, t in enumerate(token):
+                    if isinstance(t, PreprocessorIncludeToken):
+                        path = basename(str(t.path))
+                        if '"' in t.raw and path in self.data:
+                            dellist.append(i)
+                            rate = int(100 * (total - i) / total)
+                            disporder[path] += parent_score * rate
+                            disporder[name] += child_score * rate
+                            tree[path].append(name)
+                    elif isinstance(t, PreprocessorDefineToken):
+                        defs[getarg(t)].append(name)
 
-                    self.delete_lines(name, dellist)
+                self.delete_lines(name, dellist)
 
             for name, token in self.data.items():
                 for t in token:
@@ -335,7 +336,7 @@ class GenSingleHeader(object):
         if self.include_guard:
             self.result.write(f"#endif /* {self.include_guard} */")
         self.eof
-    
+
     def make(self):
         if not self.quiet:
             print("make license")
